@@ -50,7 +50,7 @@ neu-sbox version
 - 有 `api_version` 但 < 1 → 退出码 1（不兼容）
 - 无 `api_version` 字段（worker < 0.3.0）→ 退出码 0 + warning（best-effort）
 
-API 契约见 [neu_box](https://github.com/nihaopeng/neu_box) 仓库
+API 契约见 [neu_box](https://github.com/neusbox/neu_box) 仓库
 `docs/worker-api.md`。
 
 ## 构建
