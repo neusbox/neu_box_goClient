@@ -7,27 +7,45 @@ Neu Box 的终端沙盒隔离 / 命令任务提交客户端。Go 单文件静态
 ## 命令
 
 ```
-neu-sbox acquire [选项...]       创建沙盒 / 提交任务（--command 时）
+neu-sbox acquire [选项...]       为当前终端同步申请沙盒
+neu-sbox submit [选项...] -- CMD 异步提交命令任务
 neu-sbox release <sandbox_name>  释放沙盒
 neu-sbox {list|status|join}      沙盒管理
 neu-sbox {tasks|result|log}      任务队列 / 结果 / 日志
 neu-sbox check                   检查 worker 可达性与 API 版本兼容性
-neu-sbox version
+neu-sbox [--json] version
 ```
 
-`acquire` 选项：
+资源选项可用于 `acquire` 和 `submit`：
 
 | 选项 | 说明 |
 |---|---|
+| `--device 1` | 指定一张卡，可重复 |
 | `--devices 1,3` | 指定卡号（与 --device-num 互斥） |
 | `--device-num 2` | 自动分配卡数量 |
 | `--cpu 4` / `--mem 8` | 资源上限，0 = 不限 |
-| `--priority 1` | 队列优先级：0=普通，1=赶论文 |
+
+`acquire` 专属选项：
+
+| 选项 | 说明 |
+|---|---|
 | `--pid 12345` | 指定 PID（默认当前 shell 的父进程） |
-| `--command "..."` | 提交一次性命令任务（进入命令模式） |
-| `--container NAME` | 容器终端身份 / 命令目标容器 |
+| `--container NAME` | 容器终端身份 |
+
+命令任务统一使用 `submit`，其专属选项为：
+
+| 选项 | 说明 |
+|---|---|
+| `--priority 1` | 队列优先级：0=普通，数值越大越先执行 |
+| `--container NAME` | 在已有容器中执行；不指定则在 Host 执行 |
 | `--workdir PATH` | 容器命令工作目录 |
+| `--container-user USER` | 容器命令用户 |
 | `--env K=V` | 容器命令环境变量（可重复） |
+| `--command "..."` | 命令字符串；也可把命令及参数放在 `--` 后 |
+
+默认输出为适合终端阅读的摘要，不混入 Worker 原始 JSON。自动化调用可将
+`--json` 放在子命令前或紧跟子命令；成功结果写入 stdout，失败对象写入
+stderr。
 
 ## 环境变量
 
@@ -78,8 +96,8 @@ neu-sbox acquire --device-num 2
 # 退出前释放
 neu-sbox release "$(neu-sbox list | grep current)"
 
-# 提交赶论文优先级任务（4 卡）
-neu-sbox acquire --command "python train.py" --device-num 4 --priority 1
+# 提交高优先级任务（4 卡）
+neu-sbox submit --device-num 4 --priority 1 -- python train.py
 
 # 队列 / 结果
 neu-sbox tasks
