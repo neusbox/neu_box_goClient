@@ -21,6 +21,7 @@ func TestSkillInstallCreatesStandardSkillTree(t *testing.T) {
 		"SKILL.md",
 		filepath.Join("agents", "openai.yaml"),
 		filepath.Join("references", "cli.md"),
+		filepath.Join("references", "http-api.md"),
 	} {
 		info, err := os.Stat(filepath.Join(destination, relative))
 		if err != nil {
@@ -35,8 +36,19 @@ func TestSkillInstallCreatesStandardSkillTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(skill), "name: neu-box") || !strings.Contains(string(skill), "neu-sbox wait") {
+	if !strings.Contains(string(skill), "name: neu-box") ||
+		!strings.Contains(string(skill), "Worker API v2 with `curl`") ||
+		!strings.Contains(string(skill), "neu-sbox wait") {
 		t.Fatalf("unexpected SKILL.md: %s", skill)
+	}
+	httpReference, err := os.ReadFile(filepath.Join(destination, "references", "http-api.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(httpReference), "POST") ||
+		!strings.Contains(string(httpReference), "/tasks") ||
+		!strings.Contains(string(httpReference), "api_version") {
+		t.Fatalf("unexpected HTTP reference: %s", httpReference)
 	}
 	if !strings.Contains(out.String(), destination) {
 		t.Fatalf("missing destination in output: %s", out.String())

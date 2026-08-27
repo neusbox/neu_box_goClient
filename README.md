@@ -59,8 +59,10 @@ neu-sbox skill install ~/.codex/skills
 # → ~/.codex/skills/neu-box/SKILL.md
 ```
 
-skill 引导 Agent 使用 `submit --json` 保存任务 ID，再使用 `wait` 跟踪执行。
-安装操作不访问 Worker，也不需要 root。
+skill 默认引导 Agent 通过标准 `curl` 直接使用 Worker API v2，并把 `neu-sbox`
+作为可选的确定性 helper：长任务可用 `wait` 稳定处理日志 offset，终端沙盒可用
+`acquire/release` 处理 Host 与容器 PID 身份。安装操作不访问 Worker，也不需要
+root。
 
 ## 任务日志
 

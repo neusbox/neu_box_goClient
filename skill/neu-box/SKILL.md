@@ -1,35 +1,51 @@
 ---
 name: neu-box
-description: Submit, monitor, and inspect accelerator-backed jobs and terminal sandboxes through neu-sbox. Use when work should run on a Neu Box Worker, needs GPU/NPU/CPU/memory allocation, or requires following Neu Box task status and logs. Do not use for ordinary local commands that need no Neu Box resources.
+description: Submit, monitor, and inspect accelerator-backed jobs and terminal sandboxes through the Neu Box Worker HTTP API, with neu-sbox as an optional reliable helper. Use when work should run on a Neu Box Worker, needs GPU/NPU/CPU/memory allocation, or requires following Neu Box task status and logs. Do not use for ordinary local commands that need no Neu Box resources.
 ---
 
 # Neu Box
 
-Use the `neu-sbox` CLI. It talks directly to the Worker selected by `NEU_BOX_URL` and does
-not require the WebUI.
+Talk directly to the Worker selected by `NEU_BOX_URL`; the default is
+`http://127.0.0.1:59075`. Do not route through the WebUI.
+
+## Choose the interface
+
+- Use the Worker API v2 with `curl` by default. It is the transparent, normative interface
+  and does not require learning a private CLI grammar.
+- Use `neu-sbox` when it is already available and its deterministic behavior is useful,
+  especially for incremental log following or terminal sandbox identity handling. It is an
+  optional helper, not a prerequisite for this skill.
+
+Do not install software merely to switch interfaces unless the user asks. Read
+[references/http-api.md](references/http-api.md) before making direct API calls. Read
+[references/cli.md](references/cli.md) only when choosing or using the optional helper.
 
 ## Command jobs
 
-1. Run `neu-sbox check` before the first operation against a Worker.
-2. Submit with `neu-sbox submit --json ... -- <command>`. Preserve the returned `task_id`
-   before doing more work. A successful submission only means the task entered the queue.
-3. Run `neu-sbox wait <task_id>` to follow incremental logs until the task reaches
-   `completed` or `failed`. Keep waiting on that same local process when the command is
-   long-running; do not submit a duplicate task.
-4. Use `neu-sbox result --json <task_id>` when a point-in-time metadata and full-log
-   snapshot is needed.
+1. Check `/healthz` before the first operation and require `api_version >= 2`.
+2. Submit exactly once with `POST /tasks`. Preserve the returned `task_id` before doing more
+   work. HTTP 202 means only that the task entered the queue.
+3. Poll `GET /tasks/<task_id>` until `completed` or `failed`. Inspect
+   `GET /tasks/<task_id>/log` while it runs and once more after it reaches a terminal state.
+4. For long-running incremental output, `neu-sbox wait <task_id>` may replace manual status
+   and log polling when the helper is available.
 
-`wait` writes task output incrementally to stdout and status transitions to stderr. It exits
-zero only for `completed`; a failed task or monitoring error exits nonzero. Interrupting
-`wait` stops only the local follower, not the remote task. Resume with the same `task_id`.
-
-If submission returned an uncertain response, inspect `neu-sbox tasks --json` before
-retrying. The Worker has no idempotency key, so blind retries can create duplicate jobs.
+The Worker has no idempotency key. If submission returned an uncertain response, inspect
+`GET /tasks` for the original user, command, and creation time before considering another
+submission. Never blindly retry or create a duplicate task.
 
 Use the resource values the user requested. Do not raise priority, request devices, or pick
-specific device IDs without a reason grounded in the request. Prefer `submit` for Agent-run
-commands; `acquire` changes a persistent parent shell and is unsuitable for unrelated,
-short-lived command invocations.
+specific device IDs without a reason grounded in the request. Prefer queued command jobs for
+Agent-run commands; terminal acquire changes a persistent process hierarchy and is unsuitable
+for unrelated, short-lived invocations.
 
-Read [references/cli.md](references/cli.md) when choosing resource flags, running inside an
-existing Docker container, configuring the Worker URL, or diagnosing task states.
+Only cancel or delete a task when the user requested it or the active workflow clearly
+requires it. Stopping local polling does not stop the remote task.
+
+## Terminal sandboxes
+
+Use a terminal sandbox only when a persistent Worker-host process and its descendants should
+inherit the allocation. Prefer the optional `neu-sbox acquire/release` helper because it
+handles shell and container process identity. With direct HTTP, verify the Worker-host PID
+and ownership before calling `/sandbox/acquire`; always release the returned sandbox when the
+authorized terminal workflow ends.

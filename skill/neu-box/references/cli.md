@@ -1,4 +1,8 @@
-# neu-sbox command reference
+# Optional neu-sbox helper
+
+Use this reference only when `neu-sbox` is available and a deterministic helper is preferable
+to direct `curl`. The Worker HTTP API remains the normative interface; do not invent CLI flags
+or require installation of the helper.
 
 ## Connection
 
@@ -6,7 +10,7 @@
 `NEU_BOX_USER` selects the Worker host user and otherwise follows the current user.
 The Worker API has no authentication; connect only over a trusted network.
 
-Check connectivity and API compatibility:
+Check connectivity and API compatibility when selecting the helper:
 
 ```bash
 neu-sbox check
@@ -43,6 +47,9 @@ neu-sbox tasks --json
 `wait` uses byte offsets to fetch only new log segments while separately polling task state.
 At a terminal state it drains the final available segment before exiting. `--timeout 0`
 means no local wait timeout; reaching a local timeout does not cancel the Worker task.
+
+This is the main reason to choose the helper for a long-running job. Keep waiting on the same
+task ID; never submit another task merely because local monitoring stopped.
 
 Task states:
 
