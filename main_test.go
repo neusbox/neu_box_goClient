@@ -130,7 +130,7 @@ func TestReleaseUsesClientPIDAndSavedContainer(t *testing.T) {
 func TestSubmitBuildsDockerTarget(t *testing.T) {
 	var received commandRequest
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Method != http.MethodPost || request.URL.Path != "/command/run" {
+		if request.Method != http.MethodPost || request.URL.Path != "/tasks" {
 			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
 		}
 		decodeRequest(t, request, &received)
@@ -370,7 +370,7 @@ func TestPrintJSONDecodesEscapedUnicode(t *testing.T) {
 func TestResultPrintsLogAndSummary(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
-		case "/command/result/abc123":
+		case "/tasks/abc123":
 			returnCode := 0
 			writeJSON(t, writer, http.StatusOK, map[string]any{
 				"task_id":     "abc123",
@@ -387,7 +387,7 @@ func TestResultPrintsLogAndSummary(t *testing.T) {
 					"timed_out":  false,
 				},
 			})
-		case "/command/result/abc123/log":
+		case "/tasks/abc123/log":
 			_, _ = io.WriteString(writer, "hello\n")
 		default:
 			http.NotFound(writer, request)

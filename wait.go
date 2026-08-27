@@ -126,7 +126,7 @@ func parseWaitOptions(args []string) (waitOptions, error) {
 }
 
 func (a *app) fetchTaskResult(pathID string) (taskResultResponse, int) {
-	status, raw, err := a.api.request(http.MethodGet, "/command/result/"+pathID, nil, nil)
+	status, raw, err := a.api.request(http.MethodGet, "/tasks/"+pathID, nil, nil)
 	if err != nil {
 		return taskResultResponse{}, a.requestError(err)
 	}
@@ -148,7 +148,7 @@ func (a *app) drainTaskLog(pathID string, offset int64) (int64, int) {
 		}
 		status, raw, err := a.api.request(
 			http.MethodGet,
-			"/command/result/"+pathID+"/log",
+			"/tasks/"+pathID+"/log",
 			query,
 			nil,
 		)

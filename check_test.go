@@ -13,8 +13,8 @@ func TestCheckCompatibleWorker(t *testing.T) {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
 		writeJSON(t, w, http.StatusOK, map[string]any{
-			"status": "ok", "role": "worker", "api_version": 1,
-			"version": "0.3.0", "schema_version": 3,
+			"status": "ok", "role": "worker", "api_version": 2,
+			"version": "0.4.0", "schema_version": 3,
 		})
 	}))
 	defer server.Close()
@@ -23,7 +23,7 @@ func TestCheckCompatibleWorker(t *testing.T) {
 	if code := app.runCheck(nil); code != 0 {
 		t.Fatalf("runCheck code = %d, out=%q err=%q", code, out.String(), errOut.String())
 	}
-	if !strings.Contains(out.String(), "api_version: 1") || !strings.Contains(out.String(), "兼容") {
+	if !strings.Contains(out.String(), "api_version: 2") || !strings.Contains(out.String(), "兼容") {
 		t.Errorf("output missing compatibility line: %q", out.String())
 	}
 }
@@ -38,11 +38,11 @@ func TestCheckOldWorkerWithoutAPIVersion(t *testing.T) {
 	defer server.Close()
 	app, _, errOut := testApplication(server.URL, t.TempDir())
 
-	if code := app.runCheck(nil); code != 0 {
-		t.Fatalf("runCheck code = %d (旧 worker 应 best-effort 通过), err=%q", code, errOut.String())
+	if code := app.runCheck(nil); code != 1 {
+		t.Fatalf("runCheck code = %d (旧 worker 应拒绝), err=%q", code, errOut.String())
 	}
-	if !strings.Contains(errOut.String(), "warning") {
-		t.Errorf("缺少旧版本 warning: %q", errOut.String())
+	if !strings.Contains(errOut.String(), "error") {
+		t.Errorf("缺少旧版本 error: %q", errOut.String())
 	}
 }
 

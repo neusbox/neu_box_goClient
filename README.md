@@ -88,13 +88,13 @@ neu-sbox wait TASK_ID --interval 5s --timeout 2h
 
 | 客户端 | 验证过的 worker |
 |---|---|
-| 0.1.0 | ≥ 0.3.0（`api_version >= 1`） |
+| 0.2.0 | ≥ 0.4.0（`api_version >= 2`，使用 `/tasks`） |
 
 `neu-sbox check` 查询 worker `/healthz`：
 
-- `api_version >= 1` → 兼容 ✓
-- 有 `api_version` 但 < 1 → 退出码 1（不兼容）
-- 无 `api_version` 字段（worker < 0.3.0）→ 退出码 0 + warning（best-effort）
+- `api_version >= 2` → 兼容 ✓
+- 有 `api_version` 但 < 2 → 退出码 1（不兼容）
+- 无 `api_version` 字段（旧版 worker）→ 退出码 1（不支持 `/tasks`）
 
 API 契约见 [neu_box](https://github.com/neusbox/neu_box) 仓库
 `docs/worker-api.md`。

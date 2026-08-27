@@ -6,8 +6,8 @@ import (
 )
 
 // requiredAPIVersion 是本客户端要求的最低 worker API 版本。
-// worker 0.3.0 起在 /healthz 上报 api_version；低于该版本视为不兼容。
-const requiredAPIVersion = 1
+// worker 0.4.0 起使用 /tasks 资源接口（API v2）；低于该版本不兼容。
+const requiredAPIVersion = 2
 
 // healthResponse 对应 worker GET /healthz。
 type healthResponse struct {
@@ -39,8 +39,8 @@ func (a *app) runCheck(args []string) int {
 	fmt.Fprintf(a.out, "[neu-sbox] %s %s (schema %v)\n", health.Role, health.Version, health.SchemaVer)
 	if health.APIVersion == nil {
 		fmt.Fprintln(a.out, "  api_version: 未上报（旧版 worker）")
-		fmt.Fprintln(a.errOut, "warning: worker 未上报 api_version（版本 < 0.3.0）；部分新接口可能不可用")
-		return 0
+		fmt.Fprintln(a.errOut, "error: worker 未上报 api_version，不支持 /tasks；请升级 worker")
+		return 1
 	}
 	fmt.Fprintf(a.out, "  api_version: %d (客户端要求 >= %d)\n", *health.APIVersion, requiredAPIVersion)
 	if *health.APIVersion < requiredAPIVersion {

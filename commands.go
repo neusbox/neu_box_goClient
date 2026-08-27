@@ -423,7 +423,7 @@ func (a *app) submitCommand(options submitOptions) int {
 			Env:       options.environment,
 		}
 	}
-	status, raw, err := a.api.request(http.MethodPost, "/command/run", nil, payload)
+	status, raw, err := a.api.request(http.MethodPost, "/tasks", nil, payload)
 	if err != nil {
 		return a.requestError(err)
 	}
@@ -753,7 +753,7 @@ func (a *app) runTasks(args []string) int {
 	if len(args) != 0 {
 		return a.usageError("用法: neu-sbox tasks")
 	}
-	status, raw, err := a.api.request(http.MethodGet, "/command/queue", nil, nil)
+	status, raw, err := a.api.request(http.MethodGet, "/tasks", nil, nil)
 	if err != nil {
 		return a.requestError(err)
 	}
@@ -818,7 +818,7 @@ func (a *app) runResult(args []string) int {
 	}
 	taskID := strings.TrimSpace(args[0])
 	pathID := url.PathEscape(taskID)
-	status, raw, err := a.api.request(http.MethodGet, "/command/result/"+pathID, nil, nil)
+	status, raw, err := a.api.request(http.MethodGet, "/tasks/"+pathID, nil, nil)
 	if err != nil {
 		return a.requestError(err)
 	}
@@ -832,7 +832,7 @@ func (a *app) runResult(args []string) int {
 
 	logStatus, logRaw, logErr := a.api.request(
 		http.MethodGet,
-		"/command/result/"+pathID+"/log",
+		"/tasks/"+pathID+"/log",
 		url.Values{"raw": []string{"1"}},
 		nil,
 	)

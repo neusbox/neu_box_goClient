@@ -13,7 +13,7 @@ func TestWaitStreamsNewLogSegmentsUntilCompleted(t *testing.T) {
 	logOffsets := make([]string, 0, 2)
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
-		case "/command/result/abc123":
+		case "/tasks/abc123":
 			resultCalls++
 			status := "running"
 			var result any
@@ -26,7 +26,7 @@ func TestWaitStreamsNewLogSegmentsUntilCompleted(t *testing.T) {
 				"status":  status,
 				"result":  result,
 			})
-		case "/command/result/abc123/log":
+		case "/tasks/abc123/log":
 			offset := request.URL.Query().Get("offset")
 			logOffsets = append(logOffsets, offset)
 			if offset == "0" {
