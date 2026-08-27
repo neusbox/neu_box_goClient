@@ -1,0 +1,4 @@
+interface:
+  display_name: "Neu Box"
+  short_description: "Submit and monitor accelerator jobs with Neu Box"
+  default_prompt: "Use $neu-box to submit this workload and monitor it until completion."

@@ -448,7 +448,7 @@ func (a *app) submitCommand(options submitOptions) int {
 		fmt.Fprintf(a.out, "    priority: %d\n", response.Priority)
 	}
 	fmt.Fprintf(a.out, "    command: %s\n", options.command)
-	fmt.Fprintf(a.out, "    result: neu-sbox result %s\n", response.TaskID)
+	fmt.Fprintf(a.out, "    follow: neu-sbox wait %s\n", response.TaskID)
 	return 0
 }
 

@@ -11,7 +11,9 @@ neu-sbox acquire [选项...]       为当前终端同步申请沙盒
 neu-sbox submit [选项...] -- CMD 异步提交命令任务
 neu-sbox release <sandbox_name>  释放沙盒
 neu-sbox {list|status|join}      沙盒管理
-neu-sbox {tasks|result|log}      任务队列 / 结果 / 日志
+neu-sbox {tasks|result|log}      任务队列 / 结果快照 / 完整日志
+neu-sbox wait TASK_ID            增量跟踪日志并等待任务结束
+neu-sbox skill install DIR       安装内置 Agent skill 到 DIR/neu-box
 neu-sbox check                   检查 worker 可达性与 API 版本兼容性
 neu-sbox [--json] version
 ```
@@ -47,6 +49,32 @@ neu-sbox [--json] version
 `--json` 放在子命令前或紧跟子命令；成功结果写入 stdout，失败对象写入
 stderr。
 
+## Agent skill
+
+`neu-sbox` 内嵌符合标准目录规范的 `neu-box` skill，可以安装到任意技能根目录；
+目标目录不存在时自动创建：
+
+```bash
+neu-sbox skill install ~/.codex/skills
+# → ~/.codex/skills/neu-box/SKILL.md
+```
+
+skill 引导 Agent 使用 `submit --json` 保存任务 ID，再使用 `wait` 跟踪执行。
+安装操作不访问 Worker，也不需要 root。
+
+## 任务日志
+
+`result` 返回调用时的状态与完整日志快照。长任务应使用：
+
+```bash
+neu-sbox wait TASK_ID
+neu-sbox wait TASK_ID --interval 5s --timeout 2h
+```
+
+`wait` 使用日志接口的字节 offset 只读取新增部分，同时轮询任务状态；进入终态后
+再拉取一次剩余日志。日志写到 stdout，状态变化写到 stderr，任务 `completed`
+退出 0，`failed` 退出非 0。中断或本地超时只停止跟踪，不会取消远端任务。
+
 ## 环境变量
 
 | 变量 | 说明 |
@@ -60,7 +88,7 @@ stderr。
 
 | 客户端 | 验证过的 worker |
 |---|---|
-| 0.0.1 | ≥ 0.3.0（`api_version >= 1`） |
+| 0.1.0 | ≥ 0.3.0（`api_version >= 1`） |
 
 `neu-sbox check` 查询 worker `/healthz`：
 
@@ -101,5 +129,6 @@ neu-sbox submit --device-num 4 --priority 1 -- python train.py
 
 # 队列 / 结果
 neu-sbox tasks
-neu-sbox result <task_id>
+neu-sbox wait <task_id>
+neu-sbox result --json <task_id>
 ```

@@ -133,6 +133,10 @@ func (a *app) run(args []string) int {
 		return a.runTasks(args[1:])
 	case "result", "res", "log", "l":
 		return a.runResult(args[1:])
+	case "wait", "w":
+		return a.runWait(args[1:])
+	case "skill":
+		return a.runSkill(args[1:])
 	default:
 		if a.jsonOutput {
 			a.printError("unknown_command", "未知命令: "+args[0])
@@ -204,6 +208,8 @@ func (a *app) printHelpTo(writer io.Writer) {
     neu-sbox [--json] submit [选项...] -- <command> [args...]
     neu-sbox [--json] release <sandbox_name> [--container NAME]
     neu-sbox [--json] {list|status|check|join|tasks|result} [参数]
+    neu-sbox wait <task_id> [--interval 2s] [--timeout 0]
+    neu-sbox [--json] skill install <技能根目录>
 
 全局选项:
     --json                 只输出机器可读 JSON；失败信息写入 stderr
@@ -213,13 +219,16 @@ func (a *app) printHelpTo(writer io.Writer) {
     JSON 模式              --json 可放在子命令前或紧跟子命令
                            成功结果写入 stdout，失败对象写入 stderr
     result --json          在任务元数据中增加 log 字段
+    wait                   增量输出任务日志并等待终态；暂不支持 --json
     submit ... -- ...      -- 后面的参数属于目标命令，不再解析为 neu-sbox 选项
 
 命令说明:
     acquire                同步申请终端沙盒；返回成功时当前 shell 已进入沙盒
     submit                 异步提交命令任务；返回成功只表示任务已进入队列，
-                           需使用 result <task_id> 查询结果和日志
-    result <task_id>        查询异步任务的状态、执行结果和日志
+                           需使用 wait <task_id> 跟踪，或用 result 查询快照
+    wait <task_id>          增量跟踪日志直到 completed/failed
+    result <task_id>        查询异步任务的当前状态、执行结果和完整日志
+    skill install DIR       安装内置 Agent skill 到 DIR/neu-box
 
 acquire 选项:
     --device ID            指定一个卡号，可重复
@@ -250,6 +259,8 @@ submit 选项:
     join <sandbox_name>          将 Host 当前 shell 加入已有 sandbox
     tasks                        查看任务队列
     result <task_id>             查看任务输出和结果
+    wait <task_id>               跟踪增量日志并等待任务结束
+    skill install <skills-dir>   安装 Agent skill（自动创建目录）
     version                      显示客户端版本
 
 示例:
@@ -259,6 +270,8 @@ submit 选项:
     neu-sbox submit --device 1 -- npu-smi info
     neu-sbox submit --device-num 1 --priority 1 -- python train.py
     neu-sbox submit --device 1 --container training-01 --workdir /workspace -- python train.py
+    neu-sbox wait 7c65d5ac21f4
+    neu-sbox skill install ~/.codex/skills
     neu-sbox release sbx_yuxd_12345.slice
 
 环境变量:
