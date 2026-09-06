@@ -106,6 +106,9 @@ API 契约见 [neu_box](https://github.com/neusbox/neu_box) 仓库
 
 ## 构建
 
+需要 **Go >= 1.18**（用到 `any`/`strings.Cut`/`-buildvcs`）。本机 go 太旧时，
+`make build` 会给出明确报错而不是晦涩的编译错误。
+
 ```bash
 make build        # → neu-sbox + neu-sbox.sha256（本机架构）
 make test vet
@@ -117,9 +120,22 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
 
 ## 安装
 
+在源码目录内执行。目录含 `go.mod` 且有可用 go（>= 1.18）时，先自动从源码编译，
+保证装的是当前代码（避免误装过期二进制），再校验 sha256 后安装到
+`/usr/local/bin/neu-sbox`：
+
 ```bash
-./install.sh /path/to/release-dir   # 校验 sha256 → /usr/local/bin/neu-sbox
+sudo ./install.sh
 ```
+
+相关环境变量：
+
+| 变量 | 说明 |
+|---|---|
+| `NEU_SBOX_GO` | 系统 go 太旧时指向新版 go，如 `NEU_SBOX_GO=$HOME/go/bin/go` |
+| `NEU_SBOX_SKIP_BUILD=1` | 跳过编译，直接安装目录里已有的 `neu-sbox` |
+
+无 `go.mod` 的发布包目录中运行 `install.sh` 时，则直接安装预编译二进制。
 
 ## 示例
 
