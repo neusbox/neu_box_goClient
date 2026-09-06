@@ -233,7 +233,8 @@ func (a *app) printHelpTo(writer io.Writer) {
 acquire 选项:
     --device ID            指定一个卡号，可重复
     --devices 1,3          指定卡号，逗号分隔
-    --device-num 2         自动分配卡数量；与 --device/--devices 互斥
+    --device-num 2         自动分配卡数量；不指定任何设备选项时默认 1；
+                           与 --device/--devices 互斥
     --cpu 4                CPU 核数，0 表示不限
     --mem 8                内存 GB，0 表示不限
     --pid 12345            指定 PID；默认使用启动客户端的当前 shell
@@ -242,7 +243,8 @@ acquire 选项:
 submit 选项:
     --device ID            指定一个卡号，可重复
     --devices 1,3          指定卡号，逗号分隔
-    --device-num 2         自动分配卡数量；与 --device/--devices 互斥
+    --device-num 2         自动分配卡数量；不指定任何设备选项时默认 1；
+                           与 --device/--devices 互斥
     --cpu 4                CPU 核数，0 表示不限
     --mem 8                内存 GB，0 表示不限
     --priority 1           队列优先级，数值越大越先执行；0 表示普通

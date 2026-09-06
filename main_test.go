@@ -175,6 +175,102 @@ func TestSubmitBuildsDockerTarget(t *testing.T) {
 	}
 }
 
+func TestSubmitDefaultsToOneDevice(t *testing.T) {
+	var received commandRequest
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/tasks" {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		decodeRequest(t, request, &received)
+		writeJSON(t, writer, http.StatusAccepted, map[string]any{
+			"task_id":  "abc123",
+			"position": 1,
+		})
+	}))
+	defer server.Close()
+
+	application, _, errOut := testApplication(server.URL, t.TempDir())
+	code := application.run([]string{"submit", "--", "echo", "hi"})
+	if code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
+	}
+	if received.DeviceNum != 1 {
+		t.Fatalf("expected default device_num=1, got %+v", received)
+	}
+}
+
+func TestAcquireDefaultsToOneDevice(t *testing.T) {
+	var received terminalAcquireRequest
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/sandbox/acquire" {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		decodeRequest(t, request, &received)
+		writeJSON(t, writer, http.StatusCreated, map[string]any{
+			"sandbox_name": "sbx_yuxd_43210.slice",
+			"devices":      []string{"235:1"},
+		})
+	}))
+	defer server.Close()
+
+	application, _, errOut := testApplication(server.URL, t.TempDir())
+	code := application.run([]string{"acquire"})
+	if code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
+	}
+	if received.DeviceNum != 1 {
+		t.Fatalf("expected default device_num=1, got %+v", received)
+	}
+}
+
+func TestExplicitZeroDeviceNumIsKept(t *testing.T) {
+	var received commandRequest
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/tasks" {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		decodeRequest(t, request, &received)
+		writeJSON(t, writer, http.StatusAccepted, map[string]any{
+			"task_id":  "abc123",
+			"position": 1,
+		})
+	}))
+	defer server.Close()
+
+	application, _, errOut := testApplication(server.URL, t.TempDir())
+	code := application.run([]string{"submit", "--device-num", "0", "--", "echo", "hi"})
+	if code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
+	}
+	if received.DeviceNum != 0 {
+		t.Fatalf("explicit --device-num 0 must be kept, got %+v", received)
+	}
+}
+
+func TestAcquirePositionalZeroDeviceNumIsKept(t *testing.T) {
+	var received terminalAcquireRequest
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method != http.MethodPost || request.URL.Path != "/sandbox/acquire" {
+			t.Errorf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+		decodeRequest(t, request, &received)
+		writeJSON(t, writer, http.StatusCreated, map[string]any{
+			"sandbox_name": "sbx_yuxd_43210.slice",
+			"devices":      []string{},
+		})
+	}))
+	defer server.Close()
+
+	application, _, errOut := testApplication(server.URL, t.TempDir())
+	code := application.run([]string{"acquire", "0", "2", "4"})
+	if code != 0 {
+		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
+	}
+	if received.DeviceNum != 0 || received.CPU != 2 || received.Memory != 4 {
+		t.Fatalf("positional resource args must be kept, got %+v", received)
+	}
+}
+
 func TestSubmitPriority(t *testing.T) {
 	var received commandRequest
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -24,8 +24,11 @@ neu-sbox [--json] version
 |---|---|
 | `--device 1` | 指定一张卡，可重复 |
 | `--devices 1,3` | 指定卡号（与 --device-num 互斥） |
-| `--device-num 2` | 自动分配卡数量 |
+| `--device-num 2` | 自动分配卡数量；不指定任何设备选项时默认 1，`--device-num 0` 表示不申请卡 |
 | `--cpu 4` / `--mem 8` | 资源上限，0 = 不限 |
+
+未指定任何设备选项（`--device`/`--devices`/`--device-num` 及 acquire 位置参数）时，
+设备数默认为 1；显式传 `--device-num 0` 表示不申请设备。
 
 `acquire` 专属选项：
 

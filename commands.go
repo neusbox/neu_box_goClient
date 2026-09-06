@@ -139,7 +139,7 @@ func parseAcquireOptions(args []string) (acquireOptions, error) {
 	if err := applyPositionalResources(&options.resourceOptions, positionals); err != nil {
 		return options, err
 	}
-	if err := validateResourceOptions(options.resourceOptions); err != nil {
+	if err := validateResourceOptions(&options.resourceOptions); err != nil {
 		return options, err
 	}
 	return options, nil
@@ -239,7 +239,7 @@ func parseSubmitOptions(args []string) (submitOptions, error) {
 	if options.container == "" && (options.workdir != "" || options.containerUser != "" || len(options.environment) > 0) {
 		return options, errors.New("--workdir/--container-user/--env 必须配合 --container")
 	}
-	if err := validateResourceOptions(options.resourceOptions); err != nil {
+	if err := validateResourceOptions(&options.resourceOptions); err != nil {
 		return options, err
 	}
 	return options, nil
@@ -327,6 +327,7 @@ func applyPositionalResources(options *resourceOptions, positionals []string) er
 		if err != nil {
 			return err
 		}
+		options.deviceNumSet = true
 	}
 	if len(positionals) > 1 && !options.cpuSet {
 		options.cpu, err = nonNegativeInteger("cpu", positionals[1])
@@ -346,9 +347,12 @@ func applyPositionalResources(options *resourceOptions, positionals []string) er
 	return nil
 }
 
-func validateResourceOptions(options resourceOptions) error {
+func validateResourceOptions(options *resourceOptions) error {
 	if options.deviceNumSet && len(options.deviceIDs) > 0 {
 		return errors.New("--device/--devices 与 --device-num 互斥")
+	}
+	if !options.deviceNumSet && len(options.deviceIDs) == 0 {
+		options.deviceNum = 1
 	}
 	return nil
 }

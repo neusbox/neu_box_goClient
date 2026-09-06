@@ -26,7 +26,9 @@ neu-sbox submit --json \
 
 Relevant options:
 
-- `--device-num N`: automatically allocate N accelerator devices.
+- `--device-num N`: automatically allocate N accelerator devices. If no device option
+  is given at all, the CLI defaults to 1 device; pass `--device-num 0` to request none. When no device option
+  is given at all, the CLI defaults to 1 device; pass `--device-num 0` to request none.
 - `--device ID` or `--devices 1,3`: request exact device IDs; mutually exclusive with
   `--device-num`.
 - `--cpu N`, `--mem N`: CPU cores and memory in GB; zero or omission means unlimited.
