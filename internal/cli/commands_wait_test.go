@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"net/http"
@@ -44,7 +44,7 @@ func TestWaitStreamsNewLogSegmentsUntilCompleted(t *testing.T) {
 	}))
 	defer server.Close()
 
-	application, out, errOut := testApplication(server.URL, t.TempDir())
+	application, out, errOut := testApplication(server.URL)
 	code := application.run([]string{"wait", "abc123", "--interval", "1ms"})
 	if code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
@@ -82,7 +82,7 @@ func TestWaitReturnsFailureForFailedTask(t *testing.T) {
 	}))
 	defer server.Close()
 
-	application, out, errOut := testApplication(server.URL, t.TempDir())
+	application, out, errOut := testApplication(server.URL)
 	code := application.run([]string{"wait", "failed1", "--interval", "1ms"})
 	if code != 1 {
 		t.Fatalf("exit=%d stderr=%s", code, errOut.String())

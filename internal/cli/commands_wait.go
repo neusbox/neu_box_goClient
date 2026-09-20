@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"errors"
@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/neusbox/neu_box_goClient/internal/api"
 )
 
 const (
@@ -30,7 +32,7 @@ type taskLogResponse struct {
 
 func (a *app) runWait(args []string) int {
 	if a.jsonOutput {
-		return a.usageError("wait 会连续输出日志，暂不支持 --json；请直接使用 neu-sbox wait <task_id>")
+		return a.usageError("wait 会连续输出日志，暂不支持 --json；请直接使用 neubox wait <task_id>")
 	}
 	options, err := parseWaitOptions(args)
 	if err != nil {
@@ -47,7 +49,7 @@ func (a *app) runWait(args []string) int {
 			return code
 		}
 		if response.Status != lastStatus {
-			fmt.Fprintf(a.errOut, "[neu-sbox] task %s status: %s\n", options.taskID, response.Status)
+			fmt.Fprintf(a.errOut, "[neubox] task %s status: %s\n", options.taskID, response.Status)
 			lastStatus = response.Status
 		}
 
@@ -114,27 +116,27 @@ func parseWaitOptions(args []string) (waitOptions, error) {
 				return options, fmt.Errorf("未知 wait 选项: %s", argument)
 			}
 			if argument == "" || options.taskID != "" {
-				return options, errors.New("用法: neu-sbox wait <task_id> [--interval 2s] [--timeout 0]")
+				return options, errors.New("用法: neubox wait <task_id> [--interval 2s] [--timeout 0]")
 			}
 			options.taskID = argument
 		}
 	}
 	if options.taskID == "" {
-		return options, errors.New("用法: neu-sbox wait <task_id> [--interval 2s] [--timeout 0]")
+		return options, errors.New("用法: neubox wait <task_id> [--interval 2s] [--timeout 0]")
 	}
 	return options, nil
 }
 
 func (a *app) fetchTaskResult(pathID string) (taskResultResponse, int) {
-	status, raw, err := a.api.request(http.MethodGet, "/tasks/"+pathID, nil, nil)
+	status, raw, err := a.worker.Request(http.MethodGet, "/tasks/"+pathID, nil, nil)
 	if err != nil {
 		return taskResultResponse{}, a.requestError(err)
 	}
-	if err := responseError(status, raw); err != nil {
+	if err := api.ResponseError(status, raw); err != nil {
 		return taskResultResponse{}, a.workerFailure(status, raw)
 	}
 	var response taskResultResponse
-	if err := decodeJSON(raw, &response); err != nil {
+	if err := api.DecodeJSON(raw, &response); err != nil {
 		return taskResultResponse{}, a.internalError("invalid_worker_response", err)
 	}
 	return response, 0
@@ -146,7 +148,7 @@ func (a *app) drainTaskLog(pathID string, offset int64) (int64, int) {
 			"limit":  []string{strconv.FormatInt(waitLogChunkSize, 10)},
 			"offset": []string{strconv.FormatInt(offset, 10)},
 		}
-		status, raw, err := a.api.request(
+		status, raw, err := a.worker.Request(
 			http.MethodGet,
 			"/tasks/"+pathID+"/log",
 			query,
@@ -155,11 +157,11 @@ func (a *app) drainTaskLog(pathID string, offset int64) (int64, int) {
 		if err != nil {
 			return offset, a.requestError(fmt.Errorf("获取任务日志: %w", err))
 		}
-		if err := responseError(status, raw); err != nil {
+		if err := api.ResponseError(status, raw); err != nil {
 			return offset, a.workerFailure(status, raw)
 		}
 		var response taskLogResponse
-		if err := decodeJSON(raw, &response); err != nil {
+		if err := api.DecodeJSON(raw, &response); err != nil {
 			return offset, a.internalError("invalid_worker_response", err)
 		}
 		if response.Offset < 0 || response.TotalSize < response.Offset {
@@ -191,7 +193,7 @@ func (a *app) drainTaskLog(pathID string, offset int64) (int64, int) {
 }
 
 func (a *app) printWaitResult(response taskResultResponse) {
-	fmt.Fprintf(a.errOut, "[neu-sbox] task %s finished: %s", response.TaskID, response.Status)
+	fmt.Fprintf(a.errOut, "[neubox] task %s finished: %s", response.TaskID, response.Status)
 	if response.Result != nil && response.Result.ReturnCode != nil {
 		fmt.Fprintf(a.errOut, " rc=%d", *response.Result.ReturnCode)
 	}

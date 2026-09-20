@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ func TestCheckCompatibleWorker(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	app, out, errOut := testApplication(server.URL, t.TempDir())
+	app, out, errOut := testApplication(server.URL)
 
 	if code := app.runCheck(nil); code != 0 {
 		t.Fatalf("runCheck code = %d, out=%q err=%q", code, out.String(), errOut.String())
@@ -36,7 +36,7 @@ func TestCheckOldWorkerWithoutAPIVersion(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	app, _, errOut := testApplication(server.URL, t.TempDir())
+	app, _, errOut := testApplication(server.URL)
 
 	if code := app.runCheck(nil); code != 1 {
 		t.Fatalf("runCheck code = %d (旧 worker 应拒绝), err=%q", code, errOut.String())
@@ -54,7 +54,7 @@ func TestCheckIncompatibleWorkerAPI(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	app, _, errOut := testApplication(server.URL, t.TempDir())
+	app, _, errOut := testApplication(server.URL)
 
 	if code := app.runCheck(nil); code != 1 {
 		t.Fatalf("runCheck code = %d, 期望 1, err=%q", code, errOut.String())
