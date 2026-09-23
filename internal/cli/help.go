@@ -16,6 +16,7 @@ func (a *app) printHelpTo(writer io.Writer) {
     neubox [--json] acquire [选项...]
     neubox [--json] submit [选项...] -- <command> [args...]
     neubox [--json] release <sandbox_name>
+    neubox [--json] cancel <id> [--kind task|acquire]
     neubox [--json] docker run <docker 参数...>
     neubox [--json] {list|status|check|join|tasks|result} [参数]
     neubox wait <task_id> [--interval 2s] [--timeout 0]
@@ -82,6 +83,8 @@ submit 选项:
     neubox submit --device 1 --image training:v1 --workdir /workspace -- python train.py
     neubox wait 7c65d5ac21f4
     neubox release sbx_yuxd_12345.slice
+    neubox cancel 7c65d5ac21f4            # 取消排队中/运行中的任务
+    neubox cancel 9f0a1b2c3d4e --kind acquire
     neubox docker run --rm -it ubuntu bash
 
 环境变量:
@@ -92,5 +95,9 @@ submit 选项:
 容器即使卡空着也一律拿不到设备（fail-closed）。docker run 子命令会自动补上这行
 annotation；直接用原生 docker 的话得自己写。客户端是静态二进制，运行时不依赖
 Bash、curl 或 Python。
+
+cancel 的语义：排队中的条目被摘出队列（任务留痕为 cancelled，记录与日志保留）；
+运行中的任务发取消信号；已经拿到卡的 acquire 就地释放，不需要再补一次 release。
+acquire 阻塞排队期间按 Ctrl-C 走的就是这条路径（退出码 130）。
 `)
 }

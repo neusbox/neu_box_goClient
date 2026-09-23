@@ -43,11 +43,22 @@ func (a *app) runTasks(args []string) int {
 	}
 	for _, task := range response.Queue {
 		fmt.Fprintln(a.out)
-		fmt.Fprintf(a.out, "    %s\n", task.TaskID)
+		fmt.Fprintf(a.out, "    %s\n", entryID(task))
+		fmt.Fprintf(a.out, "        kind: %s\n", entryKind(task))
 		fmt.Fprintf(a.out, "        status: %s\n", task.Status)
 		fmt.Fprintf(a.out, "        user: %s\n", task.UserID)
-		fmt.Fprintf(a.out, "        command: %s\n", task.Command)
-		if task.Status == "queued" && task.Position > 0 {
+		if entryKind(task) == "acquire" {
+			// acquire 是会话不是命令任务：没有 command / 日志 / 退出码。
+			if task.PID != 0 {
+				fmt.Fprintf(a.out, "        pid: %d\n", task.PID)
+			}
+			if task.Sandbox != "" {
+				fmt.Fprintf(a.out, "        sandbox: %s\n", task.Sandbox)
+			}
+		} else {
+			fmt.Fprintf(a.out, "        command: %s\n", task.Command)
+		}
+		if task.Position > 0 {
 			fmt.Fprintf(a.out, "        position: #%d\n", task.Position)
 		}
 		if resources := taskResourceText(task); resources != "" {
@@ -55,6 +66,22 @@ func (a *app) runTasks(args []string) int {
 		}
 	}
 	return 0
+}
+
+// entryKind / entryID 兼容两类条目：任务用 task_id，acquire 会话用 request_id。
+// 老 Worker 不带 kind/id 字段时按任务处理。
+func entryKind(entry taskResultResponse) string {
+	if entry.Kind != "" {
+		return entry.Kind
+	}
+	return "task"
+}
+
+func entryID(entry taskResultResponse) string {
+	if entry.ID != "" {
+		return entry.ID
+	}
+	return entry.TaskID
 }
 
 type taskResult struct {
@@ -65,10 +92,14 @@ type taskResult struct {
 
 type taskResultResponse struct {
 	TaskID     string      `json:"task_id"`
+	Kind       string      `json:"kind"`
+	ID         string      `json:"id"`
 	UserID     string      `json:"user_id"`
 	Command    string      `json:"command"`
 	Status     string      `json:"status"`
 	Position   int         `json:"position"`
+	PID        int         `json:"pid"`
+	Sandbox    string      `json:"sandbox_name"`
 	CPU        int         `json:"cpu"`
 	Mem        string      `json:"mem"`
 	DeviceNum  int         `json:"device_num"`

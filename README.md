@@ -10,6 +10,8 @@ Neu Box 的终端沙盒隔离 / 命令任务提交客户端。Go 单文件静态
 neubox acquire [选项...]       为当前终端同步申请沙盒
 neubox submit [选项...] -- CMD 异步提交命令任务
 neubox release <sandbox_name>  释放沙盒
+neubox cancel <id> [--kind task|acquire]
+                               取消排队中/运行中的条目（acquire 已拿到卡则就地释放）
 neubox docker run DOCKER_ARGS 透传 docker run，自动补沙盒 annotation
 neubox {list|status|join}      沙盒管理
 neubox {tasks|result|log}      任务队列 / 结果快照 / 完整日志

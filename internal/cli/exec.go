@@ -11,6 +11,10 @@ import (
 // 控制终端、信号和退出码（`-it` 要的就是这个），所以这里不能改成起子进程。
 // 注入是为了让测试不必真的去调 docker。
 //
+// **argv 是完整的 execve 参数表**：argv[0] 必须是可执行文件名本身，调用方要
+// 自己放进去（`syscall.Exec` 不做这件事）。少了它，被执行程序的 os.Args[0]
+// 会变成第一个真实参数 —— docker 就会把 `--annotation` 当顶层 flag 拒掉。
+//
 // 替换后 stdin/stdout/stderr 沿用的是当前进程的 0/1/2 号 fd；生产入口
 // Run(os.Stdout, os.Stderr) 给的就是它们。
 type ExecFn func(path string, argv []string, env []string) error

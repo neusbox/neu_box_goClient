@@ -18,9 +18,14 @@ import "strings"
 // 活的、别人的沙盒上。
 const AnnotationKey = "sandbox_cgroup"
 
-// BuildDockerArgs 返回 docker 的完整 argv（不含 docker 可执行文件本身）：
+// BuildDockerArgs 返回 docker 的命令行参数（**不含 argv[0]**，即不含可执行
+// 文件本身）：
 //
 //	run --annotation sandbox_cgroup=<annotation> <passthrough...>
+//
+// 调用方 exec 时必须自己把程序名放到最前面当 argv[0]：docker 解析的是
+// os.Args[1:]，少了这一格，"run" 会被当成程序名吃掉，第一个参数变成
+// --annotation，docker 把它当顶层 flag 拒掉（unknown flag）。
 //
 // **不注入 --runtime**：`neu-box-runtime` 已经是这台机器上的默认 runtime（daemon.json
 // 的 default-runtime），用户不需要写，我们也不该替用户写 —— 写死了反而和

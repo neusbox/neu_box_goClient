@@ -17,7 +17,15 @@ func (a *app) runRelease(args []string) int {
 	if sandboxName == "" {
 		return a.usageError("sandbox_name 不能为空")
 	}
-	payload := map[string]any{"sandbox_name": sandboxName}
+	// 报上自己的 host PID：neubox 是 acquire 借出去的那个 shell fork 出来的
+	// 子进程，cgroup 成员身份随 fork 继承 —— 它住在沙盒 cgroup 里却没有
+	// origin，而销毁的最后一步是 cgroup.kill，不带这一项就会把自己一起杀掉
+	// （zsh: killed、退出码 137）。Worker 拿到它会把**它自己**先搬回父进程的
+	// origin，再销毁沙盒。
+	payload := map[string]any{
+		"sandbox_name": sandboxName,
+		"host_pid":     a.getPID(),
+	}
 	status, raw, err := a.worker.Request(http.MethodPost, "/sandbox/release", nil, payload)
 	if err != nil {
 		return a.requestError(err)

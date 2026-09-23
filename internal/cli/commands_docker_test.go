@@ -56,9 +56,14 @@ func TestDockerRunInjectsAnnotationForOwnSandbox(t *testing.T) {
 		t.Fatalf("exec path=%q", call.path)
 	}
 	want := []string{
+		"/usr/bin/docker",
 		"run",
 		"--annotation", "sandbox_cgroup=sbx_yuxd_42.slice",
 		"--rm", "-it", "ubuntu", "bash",
+	}
+	if call.argv[0] != call.path {
+		t.Fatalf("argv[0] 必须是可执行文件名本身（execve 语义），实际 argv[0]=%q path=%q: %q",
+			call.argv[0], call.path, call.argv)
 	}
 	if !reflect.DeepEqual(call.argv, want) {
 		t.Fatalf("got  %q\nwant %q", call.argv, want)
@@ -86,7 +91,7 @@ func TestDockerRunPassesArgumentsThroughVerbatim(t *testing.T) {
 	if code := application.run(args); code != 0 {
 		t.Fatalf("exit=%d stderr=%s", code, errOut.String())
 	}
-	want := append([]string{"run", "--annotation", "sandbox_cgroup=sbx_yuxd_42.slice"}, passthrough...)
+	want := append([]string{"/usr/bin/docker", "run", "--annotation", "sandbox_cgroup=sbx_yuxd_42.slice"}, passthrough...)
 	if !reflect.DeepEqual(call.argv, want) {
 		t.Fatalf("got  %q\nwant %q", call.argv, want)
 	}

@@ -128,6 +128,8 @@ func (a *app) run(args []string) int {
 		return a.runDocker(args[1:])
 	case "join", "j":
 		return a.runJoin(args[1:])
+	case "cancel", "c":
+		return a.runCancel(args[1:])
 	case "tasks", "t":
 		return a.runTasks(args[1:])
 	case "result", "res", "log", "l":

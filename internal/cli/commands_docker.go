@@ -45,8 +45,12 @@ func (a *app) runDocker(args []string) int {
 	}
 
 	argv := dockerargs.BuildDockerArgs(sandboxName, args[1:])
+	// execve 的 argv[0] 必须是可执行文件名本身，syscall.Exec 不会替你补。
+	// 少了它，docker 进程看到的 os.Args 就是 ["run", "--annotation", ...]，
+	// 于是 --annotation 落到顶层 flag 的位置，报 "unknown flag: --annotation"。
+	full := append([]string{dockerBinary}, argv...)
 	// 成功即进程已被替换，不会再走到这里。
-	if err := a.execFn(dockerBinary, argv, os.Environ()); err != nil {
+	if err := a.execFn(dockerBinary, full, os.Environ()); err != nil {
 		a.printError("docker_exec_failed", fmt.Sprintf("启动 docker 失败: %v", err))
 		return 1
 	}
