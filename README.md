@@ -14,7 +14,9 @@ neubox cancel <id> [--kind task|acquire]
                                取消排队中/运行中的条目（acquire 已拿到卡则就地释放）
 neubox docker run DOCKER_ARGS 透传 docker run，自动补沙盒 annotation
 neubox {list|status|join}      沙盒管理
-neubox {tasks|result|log}      任务队列 / 结果快照 / 完整日志
+neubox tasks [--all | --since 4h]
+                               任务队列（默认：活跃任务 + 近 2h 结束的）
+neubox {result|log} TASK_ID    结果快照 / 完整日志
 neubox wait TASK_ID            增量跟踪日志并等待任务结束
 neubox check                   检查 worker 可达性与 API 版本兼容性
 neubox [--json] version
@@ -92,6 +94,10 @@ docker run --annotation sandbox_cgroup=<沙盒名> --rm -it ubuntu bash
 
 ## 任务日志
 
+`tasks` 默认只显示活跃任务（queued/running）和最近 2h 内结束的任务，避免每次
+调用都刷出 worker 保留的全部历史记录；`--all` 显示 worker 返回的全部条目，
+`--since 4h` 可自定义时间窗（如 `30m` / `12h`）。
+
 `result` 返回调用时的状态与完整日志快照。长任务应使用：
 
 ```bash
@@ -155,6 +161,7 @@ neubox submit --device-num 4 --priority 1 -- python train.py
 
 # 队列 / 结果
 neubox tasks
+neubox tasks --all           # 含较早结束的任务
 neubox wait <task_id>
 neubox result --json <task_id>
 

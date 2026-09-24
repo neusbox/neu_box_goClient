@@ -19,7 +19,8 @@ func (a *app) printHelpTo(writer io.Writer) {
     neubox [--json] cancel <id> [--kind task|acquire]
     neubox [--json] docker run <docker 参数...>
     neubox [--json] docker start <容器> [docker 参数...]
-    neubox [--json] {list|status|check|join|tasks|result} [参数]
+    neubox [--json] {list|status|check|join|result} [参数]
+    neubox [--json] tasks [--all] [--since 4h]
     neubox wait <task_id> [--interval 2s] [--timeout 0]
 
 全局选项:
@@ -73,7 +74,10 @@ submit 选项:
     status                       查看当前 shell 所在 sandbox
     check                        检查 Worker 可达性与 API 版本兼容性
     join <sandbox_name>          将 Host 当前 shell 加入已有 sandbox
-    tasks                        查看任务队列
+    tasks                        查看任务队列；默认只显示活跃任务和最近 2h
+                                 结束的任务（宁少勿刷屏）
+    tasks --all                  显示 worker 返回的全部任务
+    tasks --since 4h             自定义时间窗（30m / 6h / 12h 均可）
     result <task_id>             查看任务输出和结果
     wait <task_id>               跟踪增量日志并等待任务结束
     version                      显示客户端版本
@@ -85,6 +89,7 @@ submit 选项:
     neubox submit --device-num 1 --priority 1 -- python train.py
     neubox submit --device 1 --image training:v1 --workdir /workspace -- python train.py
     neubox wait 7c65d5ac21f4
+    neubox tasks --all           # 含较早结束的任务
     neubox release sbx_yuxd_12345.slice
     neubox cancel 7c65d5ac21f4            # 取消排队中/运行中的任务
     neubox cancel 9f0a1b2c3d4e --kind acquire

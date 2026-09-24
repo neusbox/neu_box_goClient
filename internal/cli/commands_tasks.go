@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,13 +12,46 @@ import (
 )
 
 type taskQueueResponse struct {
-	Queue        []taskResultResponse `json:"queue"`
-	TotalPending int                  `json:"total_pending"`
+	Queue        []json.RawMessage `json:"queue"`
+	TotalPending int               `json:"total_pending"`
+}
+
+// defaultTasksWindow 是 tasks 默认视图的时间窗：已完成/失败的任务只展示
+// finished_at 在窗口内的；活跃任务（queued/running）不受窗口限制。
+const defaultTasksWindow = 2 * time.Hour
+
+type tasksOptions struct {
+	all   bool
+	since time.Duration
+}
+
+func parseTasksOptions(args []string) (tasksOptions, error) {
+	options := tasksOptions{since: defaultTasksWindow}
+	for index := 0; index < len(args); index++ {
+		switch args[index] {
+		case "--all":
+			options.all = true
+		case "--since":
+			raw, err := optionValue(args, &index)
+			if err != nil {
+				return options, err
+			}
+			duration, err := time.ParseDuration(raw)
+			if err != nil || duration <= 0 {
+				return options, fmt.Errorf("--since 必须是正 duration，例如 30m / 6h: %q", raw)
+			}
+			options.since = duration
+		default:
+			return options, fmt.Errorf("未知 tasks 选项: %s", args[index])
+		}
+	}
+	return options, nil
 }
 
 func (a *app) runTasks(args []string) int {
-	if len(args) != 0 {
-		return a.usageError("用法: neubox tasks")
+	options, err := parseTasksOptions(args)
+	if err != nil {
+		return a.usageError(err.Error())
 	}
 	status, raw, err := a.worker.Request(http.MethodGet, "/tasks", nil, nil)
 	if err != nil {
@@ -30,18 +64,40 @@ func (a *app) runTasks(args []string) int {
 	if err := api.DecodeJSON(raw, &response); err != nil {
 		return a.internalError("invalid_worker_response", err)
 	}
+	visible, hidden := filterTaskList(response.Queue, options)
+
 	if a.jsonOutput {
-		_ = printJSON(a.out, raw)
+		if hidden == 0 {
+			// 没有过滤掉任何条目：直接透传 Worker 原始响应。
+			_ = printJSON(a.out, raw)
+		} else {
+			// RawMessage 保留 Worker 返回的全部字段（eta/priority/target 等）。
+			_ = printJSONValue(a.out, struct {
+				Queue        []json.RawMessage `json:"queue"`
+				TotalPending int               `json:"total_pending"`
+			}{visible, response.TotalPending})
+		}
 		return 0
 	}
 	fmt.Fprintln(a.out, "[neubox] 任务列表")
-	fmt.Fprintf(a.out, "    total: %d\n", len(response.Queue))
+	fmt.Fprintf(a.out, "    total: %d\n", len(visible))
 	fmt.Fprintf(a.out, "    pending: %d\n", response.TotalPending)
-	if len(response.Queue) == 0 {
+	if hidden > 0 {
+		fmt.Fprintf(a.out, "    已省略 %d 个更早结束的任务（--all 查看全部）\n", hidden)
+	}
+	tasks := make([]taskResultResponse, 0, len(visible))
+	for _, entry := range visible {
+		var task taskResultResponse
+		if err := api.DecodeJSON(entry, &task); err != nil {
+			continue
+		}
+		tasks = append(tasks, task)
+	}
+	if len(tasks) == 0 {
 		fmt.Fprintln(a.out, "    (无)")
 		return 0
 	}
-	for _, task := range response.Queue {
+	for _, task := range tasks {
 		fmt.Fprintln(a.out)
 		fmt.Fprintf(a.out, "    %s\n", entryID(task))
 		fmt.Fprintf(a.out, "        kind: %s\n", entryKind(task))
@@ -66,6 +122,48 @@ func (a *app) runTasks(args []string) int {
 		}
 	}
 	return 0
+}
+
+// filterTaskList 实现 tasks 默认视图：
+//   - 活跃条目（status 为 queued/running，含排队中的 acquire 会话）永远保留；
+//   - 已结束条目按 finished_at（缺失时退回 created_at）是否在窗口内决定；
+//   - 无法解析或没有时间的条目不隐藏（宁多勿漏）。
+//
+// 返回保留的原始条目（JSON 输出时不丢 worker 额外字段）和被隐藏的条目数。
+func filterTaskList(queue []json.RawMessage, options tasksOptions) ([]json.RawMessage, int) {
+	if options.all {
+		return queue, 0
+	}
+	cutoff := time.Now().Add(-options.since)
+	visible := make([]json.RawMessage, 0, len(queue))
+	for _, entry := range queue {
+		if taskEntryVisible(entry, cutoff) {
+			visible = append(visible, entry)
+		}
+	}
+	return visible, len(queue) - len(visible)
+}
+
+func taskEntryVisible(entry json.RawMessage, cutoff time.Time) bool {
+	var probe struct {
+		Status     string   `json:"status"`
+		CreatedAt  *float64 `json:"created_at"`
+		FinishedAt *float64 `json:"finished_at"`
+	}
+	if err := json.Unmarshal(entry, &probe); err != nil {
+		return true
+	}
+	if probe.Status == "queued" || probe.Status == "running" {
+		return true
+	}
+	timestamp := probe.FinishedAt
+	if timestamp == nil {
+		timestamp = probe.CreatedAt
+	}
+	if timestamp == nil {
+		return true
+	}
+	return time.Unix(int64(*timestamp), 0).After(cutoff)
 }
 
 // entryKind / entryID 兼容两类条目：任务用 task_id，acquire 会话用 request_id。
