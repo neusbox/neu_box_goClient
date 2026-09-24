@@ -32,6 +32,8 @@ type app struct {
 	readFile        func(string) ([]byte, error)
 	lookPath        LookPathFn
 	execFn          ExecFn
+	outputFn        OutputFn
+	runFn           RunFn
 }
 
 // Run executes one CLI invocation and returns its process exit code.
@@ -52,6 +54,8 @@ func newApp(out, errOut io.Writer) *app {
 		readFile:        os.ReadFile,
 		lookPath:        defaultLookPath,
 		execFn:          defaultExec,
+		outputFn:        defaultOutput,
+		runFn:           defaultRun,
 	}
 }
 

@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"testing"
@@ -28,6 +29,13 @@ func testApplication(serverURL string) (*app, *bytes.Buffer, *bytes.Buffer) {
 		// 测试里不碰真的 docker：路径写死，exec 只当"成功替换进程"。
 		lookPath: func(string) (string, error) { return "/usr/bin/docker", nil },
 		execFn:   func(string, []string, []string) error { return nil },
+		// inspect 与 start 也一样：默认是"不该被调到"，用例自己替换。
+		outputFn: func(string, ...string) ([]byte, error) {
+			return nil, errors.New("测试不该调用 docker inspect")
+		},
+		runFn: func(string, []string, []string) (int, error) {
+			return 0, errors.New("测试不该直接跑 docker start")
+		},
 	}
 	return application, out, errOut
 }

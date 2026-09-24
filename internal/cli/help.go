@@ -18,6 +18,7 @@ func (a *app) printHelpTo(writer io.Writer) {
     neubox [--json] release <sandbox_name>
     neubox [--json] cancel <id> [--kind task|acquire]
     neubox [--json] docker run <docker 参数...>
+    neubox [--json] docker start <容器> [docker 参数...]
     neubox [--json] {list|status|check|join|tasks|result} [参数]
     neubox wait <task_id> [--interval 2s] [--timeout 0]
 
@@ -40,6 +41,8 @@ func (a *app) printHelpTo(writer io.Writer) {
     result <task_id>        查询异步任务的当前状态、执行结果和完整日志
     docker run              透传 docker run，自动补上沙盒 annotation；
                            没有自己的选项，参数一个不改地交给 docker
+    docker start            把停着的容器拉起来，并把当前 shell 的沙盒借给它
+                           （容器名放最前面，docker 的选项跟在后面）
 
 acquire 选项:
     --device ID            指定一个卡号，可重复
@@ -86,6 +89,7 @@ submit 选项:
     neubox cancel 7c65d5ac21f4            # 取消排队中/运行中的任务
     neubox cancel 9f0a1b2c3d4e --kind acquire
     neubox docker run --rm -it ubuntu bash
+    neubox docker start my-container
 
 环境变量:
     NEU_BOX_URL            Worker 地址，默认 http://127.0.0.1:59075
@@ -95,6 +99,11 @@ submit 选项:
 容器即使卡空着也一律拿不到设备（fail-closed）。docker run 子命令会自动补上这行
 annotation；直接用原生 docker 的话得自己写。客户端是静态二进制，运行时不依赖
 Bash、curl 或 Python。
+
+docker start 拿卡靠的不是 annotation（那是建容器时写死的、改不了），而是启动前
+先存的一张借条：把当前 shell 所在沙盒借给这个容器，10 秒内有效、一次性。所以
+跨 shell 换沙盒继续用同一个容器要走 neubox docker start；直接敲原生
+docker start 没有借条，容器起得来但零卡。
 
 cancel 的语义：排队中的条目被摘出队列（任务留痕为 cancelled，记录与日志保留）；
 运行中的任务发取消信号；已经拿到卡的 acquire 就地释放，不需要再补一次 release。
