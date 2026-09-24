@@ -1,8 +1,10 @@
-package main
+package cli
 
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/neusbox/neu_box_goClient/internal/api"
 )
 
 // requiredAPIVersion 是本客户端要求的最低 worker API 版本。
@@ -21,9 +23,9 @@ type healthResponse struct {
 // runCheck 检查目标 worker 的可达性与 API 版本兼容性。
 func (a *app) runCheck(args []string) int {
 	if len(args) != 0 {
-		return a.usageError("用法: neu-sbox check")
+		return a.usageError("用法: neubox check")
 	}
-	status, raw, err := a.api.request(http.MethodGet, "/healthz", nil, nil)
+	status, raw, err := a.worker.Request(http.MethodGet, "/healthz", nil, nil)
 	if err != nil {
 		return a.requestError(err)
 	}
@@ -32,11 +34,11 @@ func (a *app) runCheck(args []string) int {
 		return 1
 	}
 	var health healthResponse
-	if err := decodeJSON(raw, &health); err != nil {
+	if err := api.DecodeJSON(raw, &health); err != nil {
 		fmt.Fprintf(a.errOut, "解析 /healthz 失败: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(a.out, "[neu-sbox] %s %s (schema %v)\n", health.Role, health.Version, health.SchemaVer)
+	fmt.Fprintf(a.out, "[neubox] %s %s (schema %v)\n", health.Role, health.Version, health.SchemaVer)
 	if health.APIVersion == nil {
 		fmt.Fprintln(a.out, "  api_version: 未上报（旧版 worker）")
 		fmt.Fprintln(a.errOut, "error: worker 未上报 api_version，不支持 /tasks；请升级 worker")

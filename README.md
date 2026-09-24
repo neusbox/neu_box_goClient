@@ -1,4 +1,4 @@
-# Neu Box Go Client (neu-sbox)
+# Neu Box Go Client (neubox)
 
 Neu Box 的终端沙盒隔离 / 命令任务提交客户端。Go 单文件静态二进制，
 **直连 worker**（不经过 WebUI/master）。
@@ -7,15 +7,17 @@ Neu Box 的终端沙盒隔离 / 命令任务提交客户端。Go 单文件静态
 ## 命令
 
 ```
-neu-sbox acquire [选项...]       为当前终端同步申请沙盒
-neu-sbox submit [选项...] -- CMD 异步提交命令任务
-neu-sbox release <sandbox_name>  释放沙盒
-neu-sbox {list|status|join}      沙盒管理
-neu-sbox {tasks|result|log}      任务队列 / 结果快照 / 完整日志
-neu-sbox wait TASK_ID            增量跟踪日志并等待任务结束
-neu-sbox skill install DIR       安装内置 Agent skill 到 DIR/neu-box
-neu-sbox check                   检查 worker 可达性与 API 版本兼容性
-neu-sbox [--json] version
+neubox acquire [选项...]       为当前终端同步申请沙盒
+neubox submit [选项...] -- CMD 异步提交命令任务
+neubox release <sandbox_name>  释放沙盒
+neubox cancel <id> [--kind task|acquire]
+                               取消排队中/运行中的条目（acquire 已拿到卡则就地释放）
+neubox docker run DOCKER_ARGS 透传 docker run，自动补沙盒 annotation
+neubox {list|status|join}      沙盒管理
+neubox {tasks|result|log}      任务队列 / 结果快照 / 完整日志
+neubox wait TASK_ID            增量跟踪日志并等待任务结束
+neubox check                   检查 worker 可达性与 API 版本兼容性
+neubox [--json] version
 ```
 
 资源选项可用于 `acquire` 和 `submit`：
@@ -35,14 +37,14 @@ neu-sbox [--json] version
 | 选项 | 说明 |
 |---|---|
 | `--pid 12345` | 指定 PID（默认当前 shell 的父进程） |
-| `--container NAME` | 容器终端身份 |
+| （无容器选项） | acquire 只接受宿主机 PID；容器应使用 Worker 创建的一次性任务 |
 
 命令任务统一使用 `submit`，其专属选项为：
 
 | 选项 | 说明 |
 |---|---|
 | `--priority 1` | 队列优先级：0=普通，数值越大越先执行 |
-| `--container NAME` | 在已有容器中执行；不指定则在 Host 执行 |
+| `--image IMAGE` | 使用 Worker 创建并登记的一次性容器 |
 | `--workdir PATH` | 容器命令工作目录 |
 | `--container-user USER` | 容器命令用户 |
 | `--env K=V` | 容器命令环境变量（可重复） |
@@ -52,28 +54,49 @@ neu-sbox [--json] version
 `--json` 放在子命令前或紧跟子命令；成功结果写入 stdout，失败对象写入
 stderr。
 
-## Agent skill
+## 容器
 
-`neu-sbox` 内嵌符合标准目录规范的 `neu-box` skill，可以安装到任意技能根目录；
-目标目录不存在时自动创建：
+容器要拿到设备，**必须带 `sandbox_cgroup` annotation**：Worker 靠它把容器登记到
+沙盒名下，没登记的容器即使卡空着也一律拿不到设备（fail-closed）。annotation 是
+传输通道不是凭证，真正的校验在 Worker 侧。
+
+`neubox docker run` 只做一件事 —— 把这行 annotation 拼出来，剩下的参数原样
+透传给 docker：
 
 ```bash
-neu-sbox skill install ~/.codex/skills
-# → ~/.codex/skills/neu-box/SKILL.md
+neubox acquire
+neubox docker run --rm -it ubuntu bash
 ```
 
-skill 默认引导 Agent 通过标准 `curl` 直接使用 Worker API v2，并把 `neu-sbox`
-作为可选的确定性 helper：长任务可用 `wait` 稳定处理日志 offset，终端沙盒可用
-`acquire/release` 处理 Host 与容器 PID 身份。安装操作不访问 Worker，也不需要
-root。
+展开后是：
+
+```bash
+docker run --annotation sandbox_cgroup=<沙盒名> --rm -it ubuntu bash
+```
+
+沙盒名按本进程 PID 反查（`GET /sandbox/status?pid=<自己>`）；查不到直接报错，
+不会退化成"不加 annotation 照样起"。
+
+不需要写 `--runtime`：`neu-box-runtime` 已经是这台机器上的默认 runtime（`daemon.json`
+的 `default-runtime`）。
+
+**`docker run` 没有自己的选项**，它之后的每个参数都原样交给 docker（包括开头的
+`--`）。要显式指定沙盒、或者要自己写 annotation，就绕开 neubox 用原生 docker：
+
+```bash
+docker run --annotation sandbox_cgroup=<沙盒名> --rm -it ubuntu bash
+```
+
+`docker run` 以外的 docker 子命令（build / ps / compose / …）本轮不支持，同样直接
+写原生 docker，或者继续用 Worker 的 `submit --image`。
 
 ## 任务日志
 
 `result` 返回调用时的状态与完整日志快照。长任务应使用：
 
 ```bash
-neu-sbox wait TASK_ID
-neu-sbox wait TASK_ID --interval 5s --timeout 2h
+neubox wait TASK_ID
+neubox wait TASK_ID --interval 5s --timeout 2h
 ```
 
 `wait` 使用日志接口的字节 offset 只读取新增部分，同时轮询任务状态；进入终态后
@@ -86,8 +109,6 @@ neu-sbox wait TASK_ID --interval 5s --timeout 2h
 |---|---|
 | `NEU_BOX_URL` | worker 地址，默认 `http://127.0.0.1:59075` |
 | `NEU_BOX_USER` | 用户名（默认取 $USER） |
-| `NEU_BOX_CONTAINER` | 容器名（容器内运行时自动探测也可） |
-| `NEU_BOX_STATE_DIR` | 沙盒状态文件目录，默认 `/tmp/neu-box-<uid>` |
 
 ## 与 worker 的兼容
 
@@ -95,7 +116,7 @@ neu-sbox wait TASK_ID --interval 5s --timeout 2h
 |---|---|
 | 0.2.0 | ≥ 0.4.0（`api_version >= 2`，使用 `/tasks`） |
 
-`neu-sbox check` 查询 worker `/healthz`：
+`neubox check` 查询 worker `/healthz`：
 
 - `api_version >= 2` → 兼容 ✓
 - 有 `api_version` 但 < 2 → 退出码 1（不兼容）
@@ -104,52 +125,39 @@ neu-sbox wait TASK_ID --interval 5s --timeout 2h
 API 契约见 [neu_box](https://github.com/neusbox/neu_box) 仓库
 `docs/worker-api.md`。
 
-## 构建
+## 构建与安装
 
-需要 **Go >= 1.18**（用到 `any`/`strings.Cut`/`-buildvcs`）。本机 go 太旧时，
-`make build` 会给出明确报错而不是晦涩的编译错误。
-
-```bash
-make build        # → neu-sbox + neu-sbox.sha256（本机架构）
-make test vet
-# 交叉编译示例:
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
-  -tags netgo,osusergo -ldflags "-s -w -X main.version=$(cat VERSION)" \
-  -o neu-sbox .
-```
-
-## 安装
-
-在源码目录内执行。目录含 `go.mod` 且有可用 go（>= 1.18）时，先自动从源码编译，
-保证装的是当前代码（避免误装过期二进制），再校验 sha256 后安装到
-`/usr/local/bin/neu-sbox`：
+需要 **Go >= 1.18**（用到 `any`/`strings.Cut`/`-buildvcs`）；工具链要求由
+`go.mod` 的 `go` 指令保证，过旧的工具链会直接构建失败。
 
 ```bash
-sudo ./install.sh
+./scripts/build.sh                 # → neubox（本机架构）
+GOARCH=arm64 ./scripts/build.sh    # 交叉构建
+go test ./... && go vet ./...
+sudo install -m 0755 neubox /usr/local/bin/neubox
 ```
-
-相关环境变量：
 
 | 变量 | 说明 |
 |---|---|
-| `NEU_SBOX_GO` | 系统 go 太旧时指向新版 go，如 `NEU_SBOX_GO=$HOME/go/bin/go` |
-| `NEU_SBOX_SKIP_BUILD=1` | 跳过编译，直接安装目录里已有的 `neu-sbox` |
-
-无 `go.mod` 的发布包目录中运行 `install.sh` 时，则直接安装预编译二进制。
+| `NEUBOX_GO` | go 不在 PATH 时指定，如 `NEUBOX_GO=$HOME/go/bin/go` |
+| `GOARCH` | 目标架构，默认本机 |
 
 ## 示例
 
 ```bash
 # 终端独占 2 张卡
-neu-sbox acquire --device-num 2
+neubox acquire --device-num 2
 # 退出前释放
-neu-sbox release "$(neu-sbox list | grep current)"
+neubox release "$(neubox list | grep current)"
 
 # 提交高优先级任务（4 卡）
-neu-sbox submit --device-num 4 --priority 1 -- python train.py
+neubox submit --device-num 4 --priority 1 -- python train.py
 
 # 队列 / 结果
-neu-sbox tasks
-neu-sbox wait <task_id>
-neu-sbox result --json <task_id>
+neubox tasks
+neubox wait <task_id>
+neubox result --json <task_id>
+
+# 沙盒里跑容器（比原生 docker run 只多一行 annotation）
+neubox docker run --rm -it ubuntu bash
 ```

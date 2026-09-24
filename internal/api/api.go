@@ -1,4 +1,4 @@
-package main
+package api
 
 import (
 	"bytes"
@@ -13,9 +13,9 @@ import (
 
 const requestTimeout = 30 * time.Second
 
-type apiClient struct {
+type Client struct {
 	baseURL string
-	client  *http.Client
+	HTTP    *http.Client
 }
 
 type apiErrorBody struct {
@@ -23,17 +23,37 @@ type apiErrorBody struct {
 	Code  string `json:"code"`
 }
 
-func newAPIClient(baseURL string) *apiClient {
-	return &apiClient{
+func NewClient(baseURL string) *Client {
+	return &Client{
 		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
-		client:  defaultHTTPClient(),
+		HTTP:    defaultHTTPClient(),
 	}
 }
 
-func (client *apiClient) request(
+func (client *Client) Request(
 	method string,
 	path string,
 	query url.Values,
+	payload any,
+) (int, []byte, error) {
+	return client.requestWithHeaders(method, path, query, "", payload)
+}
+
+func (client *Client) RequestAuth(
+	method string,
+	path string,
+	query url.Values,
+	token string,
+	payload any,
+) (int, []byte, error) {
+	return client.requestWithHeaders(method, path, query, token, payload)
+}
+
+func (client *Client) requestWithHeaders(
+	method string,
+	path string,
+	query url.Values,
+	token string,
 	payload any,
 ) (int, []byte, error) {
 	endpoint := client.baseURL + path
@@ -57,7 +77,10 @@ func (client *apiClient) request(
 	if payload != nil {
 		request.Header.Set("Content-Type", "application/json")
 	}
-	response, err := client.client.Do(request)
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	response, err := client.HTTP.Do(request)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -70,8 +93,8 @@ func (client *apiClient) request(
 	return response.StatusCode, raw, nil
 }
 
-func responseError(status int, raw []byte) error {
-	message, code := apiErrorDetails(status, raw)
+func ResponseError(status int, raw []byte) error {
+	message, code := ErrorDetails(status, raw)
 	if status >= 200 && status < 300 && message == "" {
 		return nil
 	}
@@ -81,7 +104,7 @@ func responseError(status int, raw []byte) error {
 	return fmt.Errorf("Worker 返回 HTTP %d: %s", status, message)
 }
 
-func apiErrorDetails(status int, raw []byte) (string, string) {
+func ErrorDetails(status int, raw []byte) (string, string) {
 	var body apiErrorBody
 	_ = json.Unmarshal(raw, &body)
 	if status >= 200 && status < 300 && body.Error == "" {
@@ -97,52 +120,19 @@ func apiErrorDetails(status int, raw []byte) (string, string) {
 	return message, body.Code
 }
 
-func (a *app) workerFailure(status int, raw []byte) int {
-	message, code := apiErrorDetails(status, raw)
-	if a.jsonOutput {
-		output := map[string]any{
-			"error":       message,
-			"http_status": status,
-		}
-		if code != "" {
-			output["code"] = code
-		}
-		_ = printJSONValue(a.errOut, output)
-		return 1
-	}
-	fmt.Fprintf(a.errOut, "[neu-sbox] 操作失败 (HTTP %d): %s\n", status, message)
-	if code != "" {
-		fmt.Fprintf(a.errOut, "    code: %s\n", code)
-	}
-	return 1
-}
-
-func printJSON(writer io.Writer, raw []byte) error {
-	if len(bytes.TrimSpace(raw)) == 0 {
-		fmt.Fprintln(writer, "{}")
-		return nil
-	}
-	var value any
-	if err := json.Unmarshal(raw, &value); err != nil {
-		_, _ = writer.Write(raw)
-		if len(raw) == 0 || raw[len(raw)-1] != '\n' {
-			fmt.Fprintln(writer)
-		}
-		return err
-	}
-	return printJSONValue(writer, value)
-}
-
-func printJSONValue(writer io.Writer, value any) error {
-	encoder := json.NewEncoder(writer)
-	encoder.SetEscapeHTML(false)
-	encoder.SetIndent("", "  ")
-	return encoder.Encode(value)
-}
-
-func decodeJSON(raw []byte, destination any) error {
+func DecodeJSON(raw []byte, destination any) error {
 	if err := json.Unmarshal(raw, destination); err != nil {
 		return fmt.Errorf("解析 Worker JSON: %w", err)
 	}
 	return nil
+}
+
+func defaultHTTPClient() *http.Client {
+	return &http.Client{
+		Transport: &http.Transport{Proxy: nil},
+		Timeout:   requestTimeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
 }
